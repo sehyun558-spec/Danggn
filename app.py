@@ -14,6 +14,7 @@ import json
 import math
 import random
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -375,6 +376,20 @@ def local_ip():
         return None
 
 
+def tailscale_ip():
+    """Tailscale 이 설치돼 있으면 이 컴퓨터의 Tailscale 주소(100.x.x.x)를 찾는다."""
+    for exe in ("tailscale", r"C:\Program Files\Tailscale\tailscale.exe"):
+        try:
+            out = subprocess.run([exe, "ip", "-4"], capture_output=True, text=True, timeout=5,
+                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except (OSError, subprocess.SubprocessError):
+            continue
+        ip = out.stdout.strip().splitlines()[0] if out.stdout.strip() else ""
+        if ip.startswith("100."):
+            return ip
+    return None
+
+
 def main():
     print("=" * 50)
     print(" 당근 매물 모아보기를 시작해요")
@@ -385,6 +400,9 @@ def main():
     ip = local_ip()
     if ip:
         print(f"같은 와이파이의 휴대폰에서:  http://{ip}:{PORT}")
+    ts = tailscale_ip()
+    if ts:
+        print(f"아이폰 어디서나 (Tailscale):  http://{ts}:{PORT}")
     print()
 
     # 켤 때마다 예전 화면을 지우고 '확인 중' 화면으로 바꾼다
