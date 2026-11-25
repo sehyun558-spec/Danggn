@@ -92,6 +92,11 @@ def main():
     settings = load_settings()
     keyword = settings["searches"][0]["keyword"]
     url = SEARCH_URL.format(q=urllib.parse.quote(keyword))
+    print("당근 주소를 붙여 넣고 엔터를 누르세요. (그냥 엔터만 누르면 기본 검색으로 확인해요)")
+    pasted = input("주소: ").strip().strip('"')
+    if pasted.startswith("https://www.daangn.com/"):
+        url = pasted
+        keyword = "(붙여 넣은 주소)"
 
     lines = [
         "=== 당근 확인 결과 ===",
@@ -137,6 +142,14 @@ def main():
             lines.append("")
             lines.append(f"[매물 목록 후보] {label} → {path[:200]}")
             lines.append(f"  개수: {len(items)}")
+            instant = sum(1 for x in items if x.get("isInstantBuyAvailable") is True)
+            lines.append(f"  바로구매 가능: {instant}개 / 아님: {len(items) - instant}개")
+            regions = {}
+            for x in items:
+                name = (x.get("region") or {}).get("name", "?")
+                regions[name] = regions.get(name, 0) + 1
+            top = sorted(regions.items(), key=lambda kv: -kv[1])[:10]
+            lines.append(f"  동네(많은 순 10개): {top}")
             lines.append(f"  항목 이름들: {sorted(items[0].keys())}")
             for item in items[:2]:
                 lines.append("  예시:")
