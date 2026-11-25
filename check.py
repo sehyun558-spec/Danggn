@@ -10,6 +10,7 @@
 import json
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -159,7 +160,71 @@ def main():
         lines.append("매물 목록 후보를 찾지 못했어요.")
         cards = re.findall(r'href="(/kr/buy-sell/[^"]+)"', html)
         lines.append(f"카드 링크 예시: {cards[:5]}")
+    if keyword != "(붙여 넣은 주소)":
+        region_probe(html, blobs, keyword, lines)
     finish(lines)
+
+
+def summarize(items):
+    instant = sum(1 for x in items if x.get("isInstantBuyAvailable") is True)
+    regions = {}
+    for x in items:
+        name = (x.get("region") or {}).get("name", "?")
+        regions[name] = regions.get(name, 0) + 1
+    top = sorted(regions.items(), key=lambda kv: -kv[1])[:10]
+    return [
+        f"  개수: {len(items)}",
+        f"  바로구매 가능: {instant}개 / 아님: {len(items) - instant}개",
+        f"  동네(많은 순 10개): {top}",
+    ]
+
+
+def region_probe(html, blobs, keyword, lines):
+    """동네를 정한 검색 주소 모양을 찾아보고, 한 번만 시험해 본다."""
+    lines.append("")
+    lines.append("=== 동네 검색 확인 ===")
+    for label, data in blobs:
+        if label != "window.__remixContext":
+            continue
+        loader = data.get("state", {}).get("loaderData", {})
+        for route, value in loader.items():
+            if isinstance(value, dict):
+                lines.append(f"[{route[:60]}] 항목: {sorted(value.keys())[:30]}")
+                for k, v in value.items():
+                    if "region" in k.lower() or "location" in k.lower():
+                        lines.append(f"  {k}: {short(v, 400)}")
+    found = []
+    for raw in re.findall(r'[?&](?:amp;)?in=([^&"\'\\\s<>]+)', html):
+        value = urllib.parse.unquote(raw)
+        if value not in found:
+            found.append(value)
+    lines.append(f"주소 속 동네 값 ({len(found)}개): {found[:30]}")
+    if not found:
+        lines.append("동네 값을 찾지 못했어요.")
+        return
+    pick = next((v for v in found if v.startswith("역삼")), None) or next(
+        (v for v in found if any(s in v for s in ("서울", "강남", "서초", "동-"))), found[0]
+    )
+    url = "https://www.daangn.com/kr/buy-sell/?in={}&search={}".format(
+        urllib.parse.quote(pick), urllib.parse.quote(keyword)
+    )
+    print("10초 쉬었다가 동네 검색을 한 번 더 확인할게요...")
+    time.sleep(10)
+    try:
+        status, final_url, page = fetch(url)
+    except Exception as e:
+        lines.append(f"동네 검색 접속 실패: {e}")
+        return
+    lines.append(f"시험한 동네 값: {pick}")
+    lines.append(f"요청 주소: {url}")
+    lines.append(f"응답 번호: {status}")
+    lines.append(f"최종 주소: {final_url}")
+    if status != 200:
+        return
+    for label, data in json_blobs(page):
+        for path, items in find_item_lists(data)[:2]:
+            lines.append(f"[동네 검색 목록] {path[:150]}")
+            lines += summarize(items)
 
 
 def finish(lines):
