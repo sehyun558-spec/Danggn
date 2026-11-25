@@ -387,6 +387,15 @@ def tailscale_ip():
         ip = out.stdout.strip().splitlines()[0] if out.stdout.strip() else ""
         if ip.startswith("100."):
             return ip
+    # 위 방법이 안 되면, 이 컴퓨터의 주소 목록에서 100.64~100.127 로 시작하는 것을 찾는다.
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            parts = ip.split(".")
+            if parts[0] == "100" and 64 <= int(parts[1]) <= 127:
+                return ip
+    except (OSError, ValueError, IndexError):
+        pass
     return None
 
 
@@ -399,10 +408,12 @@ def main():
     print(f"\n결과 화면 주소 (이 컴퓨터):  http://localhost:{PORT}")
     ip = local_ip()
     if ip:
-        print(f"같은 와이파이의 휴대폰에서:  http://{ip}:{PORT}")
+        print(f"같은 와이파이의 휴대폰에서:  http://{ip}:{PORT}   (집 와이파이에서만 돼요)")
     ts = tailscale_ip()
     if ts:
-        print(f"아이폰 어디서나 (Tailscale):  http://{ts}:{PORT}")
+        print(f"아이폰 어디서나 (Tailscale):  http://{ts}:{PORT}   (데이터로도 돼요)")
+    else:
+        print("아이폰 어디서나 (Tailscale):  아직 연결 안 됨 - 컴퓨터의 Tailscale 로그인을 확인하세요")
     print()
 
     # 켤 때마다 예전 화면을 지우고 '확인 중' 화면으로 바꾼다
