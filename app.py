@@ -365,9 +365,10 @@ def main():
         print(f"같은 와이파이의 휴대폰에서:  http://{ip}:{PORT}")
     print()
 
-    if not PAGE_FILE.exists():
-        write_page("<meta charset='utf-8'><p style='font-family:sans-serif;padding:20px'>"
-                   "첫 확인 중이에요. 1분쯤 뒤에 새로 고침 해 주세요.</p>")
+    # 켤 때마다 예전 화면을 지우고 '확인 중' 화면으로 바꾼다
+    write_page("<meta charset='utf-8'><meta http-equiv='refresh' content='30'>"
+               "<p style='font-family:sans-serif;padding:20px'>"
+               "확인 중이에요. 잠시 뒤 자동으로 새로 고침 돼요.</p>")
     webbrowser.open(f"http://localhost:{PORT}")
 
     seen = load_seen()
