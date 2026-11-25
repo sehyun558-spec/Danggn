@@ -11,6 +11,7 @@
 
 import html
 import json
+import math
 import random
 import socket
 import sys
@@ -115,6 +116,23 @@ def parse_time(text):
         return None
 
 
+def distance_km(a, b):
+    """두 위치(위도, 경도) 사이의 거리(km)."""
+    lat1, lon1, lat2, lon2 = map(math.radians, (*a, *b))
+    h = (math.sin((lat2 - lat1) / 2) ** 2
+         + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2)
+    return 6371 * 2 * math.asin(math.sqrt(h))
+
+
+def article_location(article):
+    for c in article.get("contentCoordinates") or []:
+        try:
+            return float(c["latitude"]), float(c["longitude"])
+        except (KeyError, TypeError, ValueError):
+            continue
+    return None
+
+
 def clean(article, search, settings):
     """조건에 맞으면 화면에 쓸 정보를 돌려주고, 아니면 None."""
     keyword = search["keyword"]
@@ -136,6 +154,10 @@ def clean(article, search, settings):
     if settings["max_age_days"]:
         t = parse_time(posted)
         if t and datetime.now(timezone.utc) - t > timedelta(days=settings["max_age_days"]):
+            return None
+    if settings["radius_km"]:
+        loc = article_location(article)
+        if loc and distance_km(settings["center"], loc) > settings["radius_km"]:
             return None
     href = article.get("href") or article.get("id") or ""
     return {

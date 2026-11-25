@@ -7,6 +7,18 @@ HERE = Path(__file__).resolve().parent
 SETTINGS_FILE = HERE / "설정.txt"
 MIN_INTERVAL_MINUTES = 15
 
+# '기준 위치'에 이름으로 쓸 수 있는 곳들 (위도, 경도)
+PLACES = {
+    "서울시청": (37.5665, 126.9780),
+    "강남역": (37.4979, 127.0276),
+    "잠실역": (37.5133, 127.1000),
+    "홍대입구역": (37.5572, 126.9245),
+    "수원역": (37.2665, 127.0001),
+    "인천시청": (37.4563, 126.7052),
+    "판교역": (37.3948, 127.1112),
+    "일산": (37.6584, 126.7698),
+}
+
 
 def _read_text(path):
     # 윈도우 메모장은 저장 방식이 두 가지일 수 있어서 둘 다 시도한다.
@@ -46,6 +58,7 @@ def load_settings(path=SETTINGS_FILE):
 
     searches, exclude_words, interval = [], [], MIN_INTERVAL_MINUTES
     title_must_match, max_age_days = True, 0
+    center, radius_km = None, 0
     section = None
     for line_no, line in enumerate(_read_text(path).splitlines(), start=1):
         line = line.strip()
@@ -92,6 +105,21 @@ def load_settings(path=SETTINGS_FILE):
                         interval = max(MIN_INTERVAL_MINUTES, int(digits))
                 elif name.startswith("제목에 검색어"):
                     title_must_match = not value.startswith(("아니", "no", "No", "끄"))
+                elif name.startswith("기준 위치"):
+                    if value in PLACES:
+                        center = PLACES[value]
+                    else:
+                        nums = re.findall(r"-?\d+(?:\.\d+)?", value)
+                        if len(nums) != 2:
+                            raise SystemExit(
+                                f"설정.txt {line_no}번째 줄의 기준 위치를 모르겠어요: '{value}'\n"
+                                f"  이 중에서 고르거나 '37.5665, 126.9780' 처럼 숫자로 써 주세요: "
+                                f"{', '.join(PLACES)}"
+                            )
+                        center = (float(nums[0]), float(nums[1]))
+                elif name.startswith("거리"):
+                    digits = re.sub(r"[^\d.]", "", value)
+                    radius_km = float(digits) if digits else 0
                 elif name.startswith("최근"):
                     digits = re.sub(r"\D", "", value)
                     max_age_days = int(digits) if digits else 0
@@ -105,4 +133,6 @@ def load_settings(path=SETTINGS_FILE):
         "interval_minutes": interval,
         "title_must_match": title_must_match,
         "max_age_days": max_age_days,
+        "center": center or PLACES["서울시청"],
+        "radius_km": radius_km,
     }
