@@ -191,14 +191,24 @@ def region_probe(html, blobs, keyword, lines):
             if isinstance(value, dict):
                 lines.append(f"[{route[:60]}] 항목: {sorted(value.keys())[:30]}")
                 for k, v in value.items():
-                    if "region" in k.lower() or "location" in k.lower():
-                        lines.append(f"  {k}: {short(v, 400)}")
+                    if k in ("currentFilters", "listSearch", "searchQueryAdjustment", "searchRegion"):
+                        lines.append(f"  {k}: {short(v, 600)}")
     found = []
     for raw in re.findall(r'[?&](?:amp;)?in=([^&"\'\\\s<>]+)', html):
         value = urllib.parse.unquote(raw)
         if value not in found:
             found.append(value)
     lines.append(f"주소 속 동네 값 ({len(found)}개): {found[:30]}")
+    if not found:
+        # 페이지 속 기본 동네(searchRegion)로 '이름-번호' 모양을 만들어 본다.
+        for label, data in blobs:
+            if label != "window.__remixContext":
+                continue
+            for value in data.get("state", {}).get("loaderData", {}).values():
+                region = value.get("searchRegion") if isinstance(value, dict) else None
+                if isinstance(region, dict) and region.get("id") and region.get("name"):
+                    found.append(f"{region['name']}-{region['id']}")
+        lines.append(f"기본 동네로 만든 값: {found}")
     if not found:
         lines.append("동네 값을 찾지 못했어요.")
         return
