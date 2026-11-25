@@ -61,8 +61,13 @@ def load_settings(path=SETTINGS_FILE):
                     f"설정.txt {line_no}번째 줄을 이해하지 못했어요: '{line}'\n"
                     "  '검색어 / 최대 가격' 모양으로 써 주세요. 예) 아이패드 에어5 / 30만원"
                 )
-            keyword, price_text = line.rsplit("/", 1)
-            keyword = keyword.strip()
+            # 검색어 / 가격 / (선택) 이 물건에만 쓸 제외 단어
+            parts = line.split("/")
+            keyword, price_text = parts[0].strip(), parts[1]
+            extra_exclude = []
+            if len(parts) > 2:
+                extra = "/".join(parts[2:]).split(":", 1)[-1]
+                extra_exclude = [w.strip() for w in extra.split(",") if w.strip()]
             # '30만원' 또는 '15만원 ~ 30만원' (최소 ~ 최대)
             if "~" in price_text:
                 low_text, high_text = price_text.split("~", 1)
@@ -74,7 +79,8 @@ def load_settings(path=SETTINGS_FILE):
                 raise SystemExit(
                     f"설정.txt {line_no}번째 줄의 검색어나 가격이 이상해요: '{line}'"
                 )
-            searches.append({"keyword": keyword, "max_price": price, "min_price": min_price})
+            searches.append({"keyword": keyword, "max_price": price, "min_price": min_price,
+                             "exclude_words": extra_exclude})
         elif section == "제외 단어":
             exclude_words += [w.strip() for w in line.split(",") if w.strip()]
         elif section == "기타":

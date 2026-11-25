@@ -125,7 +125,7 @@ def clean(article, search, settings):
         return None
     if price is None or not (search["min_price"] <= price <= search["max_price"]):
         return None
-    if any(word in title for word in settings["exclude_words"]):
+    if any(word in title for word in settings["exclude_words"] + search["exclude_words"]):
         return None
     if settings["title_must_match"]:
         # 검색어의 낱말이 제목에 모두 들어 있어야 함 (띄어쓰기는 무시)
