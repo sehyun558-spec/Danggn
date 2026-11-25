@@ -45,6 +45,7 @@ def load_settings(path=SETTINGS_FILE):
         raise SystemExit(f"설정 파일을 찾을 수 없어요: {path}")
 
     searches, exclude_words, interval = [], [], MIN_INTERVAL_MINUTES
+    title_must_match, max_age_days = True, 0
     section = None
     for line_no, line in enumerate(_read_text(path).splitlines(), start=1):
         line = line.strip()
@@ -62,12 +63,18 @@ def load_settings(path=SETTINGS_FILE):
                 )
             keyword, price_text = line.rsplit("/", 1)
             keyword = keyword.strip()
-            price = parse_price(price_text.strip())
-            if not keyword or price is None:
+            # '30만원' 또는 '15만원 ~ 30만원' (최소 ~ 최대)
+            if "~" in price_text:
+                low_text, high_text = price_text.split("~", 1)
+                min_price = parse_price(low_text.strip())
+            else:
+                high_text, min_price = price_text, 0
+            price = parse_price(high_text.strip())
+            if not keyword or price is None or min_price is None:
                 raise SystemExit(
                     f"설정.txt {line_no}번째 줄의 검색어나 가격이 이상해요: '{line}'"
                 )
-            searches.append({"keyword": keyword, "max_price": price})
+            searches.append({"keyword": keyword, "max_price": price, "min_price": min_price})
         elif section == "제외 단어":
             exclude_words += [w.strip() for w in line.split(",") if w.strip()]
         elif section == "기타":
@@ -77,6 +84,11 @@ def load_settings(path=SETTINGS_FILE):
                     digits = re.sub(r"\D", "", value)
                     if digits:
                         interval = max(MIN_INTERVAL_MINUTES, int(digits))
+                elif name.startswith("제목에 검색어"):
+                    title_must_match = not value.startswith(("아니", "no", "No", "끄"))
+                elif name.startswith("최근"):
+                    digits = re.sub(r"\D", "", value)
+                    max_age_days = int(digits) if digits else 0
 
     if not searches:
         raise SystemExit("설정.txt의 [찾을 물건] 아래에 검색어가 하나도 없어요.")
@@ -85,4 +97,6 @@ def load_settings(path=SETTINGS_FILE):
         "searches": searches,
         "exclude_words": exclude_words,
         "interval_minutes": interval,
+        "title_must_match": title_must_match,
+        "max_age_days": max_age_days,
     }

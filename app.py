@@ -103,24 +103,47 @@ def to_price(value):
         return None
 
 
-def clean(article, keyword, max_price, exclude_words):
+def squash(text):
+    """띄어쓰기를 없애고 영어는 소문자로. ('에어 5' 와 '에어5' 를 같게 보려고)"""
+    return "".join(text.split()).lower()
+
+
+def parse_time(text):
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except (AttributeError, ValueError):
+        return None
+
+
+def clean(article, search, settings):
     """조건에 맞으면 화면에 쓸 정보를 돌려주고, 아니면 None."""
+    keyword = search["keyword"]
     title = (article.get("title") or "").strip()
     price = to_price(article.get("price"))
     status = article.get("status") or "Ongoing"
     if status != "Ongoing":  # 예약중·판매완료 등은 뺀다
         return None
-    if price is None or price > max_price:
+    if price is None or not (search["min_price"] <= price <= search["max_price"]):
         return None
-    if any(word in title for word in exclude_words):
+    if any(word in title for word in settings["exclude_words"]):
         return None
+    if settings["title_must_match"]:
+        # 검색어의 낱말이 제목에 모두 들어 있어야 함 (띄어쓰기는 무시)
+        squashed = squash(title)
+        if not all(squash(word) in squashed for word in keyword.split()):
+            return None
+    posted = article.get("boostedAt") or article.get("createdAt") or ""
+    if settings["max_age_days"]:
+        t = parse_time(posted)
+        if t and datetime.now(timezone.utc) - t > timedelta(days=settings["max_age_days"]):
+            return None
     href = article.get("href") or article.get("id") or ""
     return {
         "keyword": keyword,
         "title": title,
         "price": price,
         "region": (article.get("region") or {}).get("name", ""),
-        "time": article.get("boostedAt") or article.get("createdAt") or "",
+        "time": posted,
         "image": article.get("thumbnail") or "",
         "url": urllib.parse.urljoin(SITE, href),
         "key": href,
@@ -287,7 +310,7 @@ def check_once(settings, seen):
             continue
         kept = 0
         for a in articles:
-            it = clean(a, kw, search["max_price"], settings["exclude_words"])
+            it = clean(a, search, settings)
             if it and it["key"] not in items:
                 items[it["key"]] = it
                 kept += 1
